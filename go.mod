@@ -1,4 +1,4 @@
-module github.com/zekroTJA/timedmap
+module github.com/rbretecher-voodoo/timedmap
 
 go 1.13
 
