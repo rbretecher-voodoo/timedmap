@@ -16,7 +16,7 @@ func main() {
 
 	// Creates a new timed map which scans for
 	// expired keys every 1 second
-	tm := timedmap.New(1 * time.Second)
+	tm := timedmap.New(1*time.Second, timedmap.NewRealClock())
 
 	// Get sections 0 and 1
 	sec0 := tm.Section(0)

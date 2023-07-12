@@ -15,6 +15,7 @@ type TimedMap struct {
 	mtx         sync.RWMutex
 	container   map[keyWrap]*element
 	elementPool *sync.Pool
+	clock       Clock
 
 	cleanupTickTime time.Duration
 	cleanerTicker   *time.Ticker
@@ -53,14 +54,15 @@ type element struct {
 // manually start the cleanup loop. These both methods
 // can also be used to re-define the specification of
 // the cleanup loop when already running if you want to.
-func New(cleanupTickTime time.Duration, tickerChan ...<-chan time.Time) *TimedMap {
-	return newTimedMap(make(map[keyWrap]*element), cleanupTickTime, tickerChan)
+func New(cleanupTickTime time.Duration, clock Clock, tickerChan ...<-chan time.Time) *TimedMap {
+	return newTimedMap(make(map[keyWrap]*element), cleanupTickTime, clock, tickerChan)
 }
 
 func FromMap(
 	m interface{},
 	expiration time.Duration,
 	cleanupTickTime time.Duration,
+	clock Clock,
 	tickerChan ...<-chan time.Time,
 ) (*TimedMap, error) {
 	mv := reflect.ValueOf(m)
@@ -68,7 +70,7 @@ func FromMap(
 		return nil, ErrValueNoMap
 	}
 
-	exp := time.Now().Add(expiration)
+	exp := clock.Now().Add(expiration)
 	container := make(map[keyWrap]*element)
 
 	iter := mv.MapRange()
@@ -86,7 +88,7 @@ func FromMap(
 		container[kw] = el
 	}
 
-	return newTimedMap(container, cleanupTickTime, tickerChan), nil
+	return newTimedMap(container, cleanupTickTime, clock, tickerChan), nil
 }
 
 // Section returns a sectioned subset of
@@ -268,7 +270,7 @@ func (tm *TimedMap) expireElement(key interface{}, sec int, v *element) {
 // cleanUp iterates trhough the map and expires all key-value
 // pairs which expire time after the current time
 func (tm *TimedMap) cleanUp() {
-	now := time.Now()
+	now := tm.clock.Now()
 
 	tm.mtx.Lock()
 	defer tm.mtx.Unlock()
@@ -286,7 +288,7 @@ func (tm *TimedMap) set(key interface{}, sec int, val interface{}, expiresAfter 
 	// re-use element when existent on this key
 	if v := tm.getRaw(key, sec); v != nil {
 		v.value = val
-		v.expires = time.Now().Add(expiresAfter)
+		v.expires = tm.clock.Now().Add(expiresAfter)
 		v.cbs = cb
 		return
 	}
@@ -301,7 +303,7 @@ func (tm *TimedMap) set(key interface{}, sec int, val interface{}, expiresAfter 
 
 	v := tm.elementPool.Get().(*element)
 	v.value = val
-	v.expires = time.Now().Add(expiresAfter)
+	v.expires = tm.clock.Now().Add(expiresAfter)
 	v.cbs = cb
 	tm.container[k] = v
 }
@@ -315,7 +317,7 @@ func (tm *TimedMap) get(key interface{}, sec int) *element {
 		return nil
 	}
 
-	if time.Now().After(v.expires) {
+	if tm.clock.Now().After(v.expires) {
 		tm.mtx.Lock()
 		defer tm.mtx.Unlock()
 		tm.expireElement(key, sec, v)
@@ -382,7 +384,7 @@ func (tm *TimedMap) setExpires(key interface{}, sec int, d time.Duration) error 
 	if v == nil {
 		return ErrKeyNotFound
 	}
-	v.expires = time.Now().Add(d)
+	v.expires = tm.clock.Now().Add(d)
 	return nil
 }
 
@@ -404,6 +406,7 @@ func (tm *TimedMap) getSnapshot(sec int) (m map[interface{}]interface{}) {
 func newTimedMap(
 	container map[keyWrap]*element,
 	cleanupTickTime time.Duration,
+	clock Clock,
 	tickerChan []<-chan time.Time,
 ) *TimedMap {
 	tm := &TimedMap{
@@ -414,6 +417,7 @@ func newTimedMap(
 				return new(element)
 			},
 		},
+		clock: clock,
 	}
 
 	if len(tickerChan) > 0 {

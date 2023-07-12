@@ -14,7 +14,7 @@ const (
 )
 
 func TestNew(t *testing.T) {
-	tm := New(dCleanupTick)
+	tm := New(dCleanupTick, NewRealClock())
 
 	assert.NotNil(t, tm)
 	assert.EqualValues(t, 0, len(tm.container))
@@ -26,7 +26,7 @@ func TestFromMap(t *testing.T) {
 	t.Run("map-string-string", func(t *testing.T) {
 		tm, err := FromMap(
 			map[string]string{"foo": "bar", "bazz": "fuzz"},
-			200*time.Millisecond, 10*time.Millisecond)
+			200*time.Millisecond, 10*time.Millisecond, NewRealClock())
 		assert.Nil(t, err)
 
 		assert.EqualValues(t, "bar", tm.GetValue("foo"))
@@ -41,7 +41,7 @@ func TestFromMap(t *testing.T) {
 	t.Run("map-int-interface", func(t *testing.T) {
 		tm, err := FromMap(
 			map[int]interface{}{1: "foo", 2: 3.456},
-			200*time.Millisecond, 10*time.Millisecond)
+			200*time.Millisecond, 10*time.Millisecond, NewRealClock())
 		assert.Nil(t, err)
 
 		assert.EqualValues(t, "foo", tm.GetValue(1))
@@ -56,7 +56,7 @@ func TestFromMap(t *testing.T) {
 	t.Run("map-interface-interface", func(t *testing.T) {
 		tm, err := FromMap(
 			map[interface{}]interface{}{1: "foo", "a": 3.456},
-			200*time.Millisecond, 10*time.Millisecond)
+			200*time.Millisecond, 10*time.Millisecond, NewRealClock())
 		assert.Nil(t, err)
 
 		assert.EqualValues(t, "foo", tm.GetValue(1))
@@ -71,18 +71,18 @@ func TestFromMap(t *testing.T) {
 	t.Run("non-map", func(t *testing.T) {
 		_, err := FromMap(
 			"this is not a map",
-			200*time.Millisecond, 10*time.Millisecond)
+			200*time.Millisecond, 10*time.Millisecond, NewRealClock())
 		assert.ErrorIs(t, err, ErrValueNoMap)
 
 		_, err = FromMap(
 			nil,
-			200*time.Millisecond, 10*time.Millisecond)
+			200*time.Millisecond, 10*time.Millisecond, NewRealClock())
 		assert.ErrorIs(t, err, ErrValueNoMap)
 	})
 }
 
 func TestFlush(t *testing.T) {
-	tm := New(dCleanupTick)
+	tm := New(dCleanupTick, NewRealClock())
 
 	for i := 0; i < 10; i++ {
 		tm.set(i, 0, 1, time.Hour)
@@ -93,7 +93,7 @@ func TestFlush(t *testing.T) {
 }
 
 func TestIdent(t *testing.T) {
-	tm := New(dCleanupTick)
+	tm := New(dCleanupTick, NewRealClock())
 	assert.EqualValues(t, 0, tm.Ident())
 }
 
@@ -101,7 +101,7 @@ func TestSet(t *testing.T) {
 	const key = "tKeySet"
 	const val = "tValSet"
 
-	tm := New(dCleanupTick)
+	tm := New(dCleanupTick, NewRealClock())
 
 	tm.Set(key, val, 20*time.Millisecond)
 	if v := tm.get(key, 0); v == nil {
@@ -119,7 +119,7 @@ func TestGetValue(t *testing.T) {
 	const key = "tKeyGetVal"
 	const val = "tValGetVal"
 
-	tm := New(dCleanupTick)
+	tm := New(dCleanupTick, NewRealClock())
 
 	tm.Set(key, val, 50*time.Millisecond)
 	assert.Nil(t, tm.GetValue("keyNotExists"))
@@ -139,7 +139,7 @@ func TestGetExpire(t *testing.T) {
 	const key = "tKeyGetExp"
 	const val = "tValGetExp"
 
-	tm := New(dCleanupTick)
+	tm := New(dCleanupTick, NewRealClock())
 
 	tm.Set(key, val, 50*time.Millisecond)
 	ct := time.Now().Add(50 * time.Millisecond)
@@ -155,7 +155,7 @@ func TestGetExpire(t *testing.T) {
 func TestSetExpires(t *testing.T) {
 	const key = "tKeyRef"
 
-	tm := New(dCleanupTick)
+	tm := New(dCleanupTick, NewRealClock())
 
 	err := tm.Refresh("keyNotExists", time.Hour)
 	assert.ErrorIs(t, err, ErrKeyNotFound)
@@ -177,7 +177,7 @@ func TestSetExpires(t *testing.T) {
 func TestContains(t *testing.T) {
 	const key = "tKeyCont"
 
-	tm := New(dCleanupTick)
+	tm := New(dCleanupTick, NewRealClock())
 
 	tm.Set(key, 1, 30*time.Millisecond)
 
@@ -191,7 +191,7 @@ func TestContains(t *testing.T) {
 func TestRemove(t *testing.T) {
 	const key = "tKeyRem"
 
-	tm := New(dCleanupTick)
+	tm := New(dCleanupTick, NewRealClock())
 
 	tm.Set(key, 1, time.Hour)
 	tm.Remove(key)
@@ -202,7 +202,7 @@ func TestRemove(t *testing.T) {
 func TestRefresh(t *testing.T) {
 	const key = "tKeyRef"
 
-	tm := New(dCleanupTick)
+	tm := New(dCleanupTick, NewRealClock())
 
 	err := tm.Refresh("keyNotExists", time.Hour)
 	assert.ErrorIs(t, err, ErrKeyNotFound)
@@ -218,7 +218,7 @@ func TestRefresh(t *testing.T) {
 }
 
 func TestSize(t *testing.T) {
-	tm := New(dCleanupTick)
+	tm := New(dCleanupTick, NewRealClock())
 
 	for i := 0; i < 25; i++ {
 		tm.Set(i, 1, 50*time.Millisecond)
@@ -230,7 +230,7 @@ func TestCallback(t *testing.T) {
 	cb := new(CB)
 	cb.On("Cb").Return()
 
-	tm := New(dCleanupTick)
+	tm := New(dCleanupTick, NewRealClock())
 
 	tm.Set(1, 3, 25*time.Millisecond, cb.Cb)
 
@@ -241,7 +241,7 @@ func TestCallback(t *testing.T) {
 }
 
 func TestStopCleaner(t *testing.T) {
-	tm := New(dCleanupTick)
+	tm := New(dCleanupTick, NewRealClock())
 
 	time.Sleep(10 * time.Millisecond)
 	tm.StopCleaner()
@@ -256,7 +256,7 @@ func TestStopCleaner(t *testing.T) {
 func TestStartCleanerInternal(t *testing.T) {
 	// Test functionality
 	{
-		tm := New(0)
+		tm := New(0, NewRealClock())
 		time.Sleep(10 * time.Millisecond)
 
 		assert.False(t, tm.cleanerRunning)
@@ -278,7 +278,7 @@ func TestStartCleanerInternal(t *testing.T) {
 
 	// Test ticker overwrite and cleaner stop
 	{
-		tm := New(dCleanupTick)
+		tm := New(dCleanupTick, NewRealClock())
 		time.Sleep(10 * time.Millisecond)
 
 		oldTicker := tm.cleanerTicker
@@ -291,7 +291,7 @@ func TestStartCleanerInternal(t *testing.T) {
 func TestStartCleanerExternal(t *testing.T) {
 	// Test functionality
 	{
-		tm := New(0)
+		tm := New(0, NewRealClock())
 		time.Sleep(10 * time.Millisecond)
 
 		assert.False(t, tm.cleanerRunning)
@@ -320,7 +320,7 @@ func TestStartCleanerExternal(t *testing.T) {
 
 	// Ensure timer overwrite
 	{
-		tm := New(dCleanupTick)
+		tm := New(dCleanupTick, NewRealClock())
 		time.Sleep(10 * time.Millisecond)
 
 		assert.True(t, tm.cleanerRunning)
@@ -337,7 +337,7 @@ func TestStartCleanerExternal(t *testing.T) {
 }
 
 func TestSnapshot(t *testing.T) {
-	tm := New(1 * time.Minute)
+	tm := New(1*time.Minute, NewRealClock())
 
 	for i := 0; i < 10; i++ {
 		tm.set(i, 0, i, 1*time.Minute)
@@ -352,7 +352,7 @@ func TestSnapshot(t *testing.T) {
 }
 
 func TestConcurrentReadWrite(t *testing.T) {
-	tm := New(dCleanupTick)
+	tm := New(dCleanupTick, NewRealClock())
 
 	go func() {
 		for {
@@ -379,7 +379,7 @@ func TestConcurrentReadWrite(t *testing.T) {
 }
 
 func TestGetExpiredConcurrent(t *testing.T) {
-	tm := New(dCleanupTick)
+	tm := New(dCleanupTick, NewRealClock())
 
 	wg := sync.WaitGroup{}
 	for i := 0; i < 50000; i++ {
@@ -404,7 +404,7 @@ func TestExternalTicker(t *testing.T) {
 	const val = "tValSet"
 
 	ticker := time.NewTicker(dCleanupTick)
-	tm := New(0, ticker.C)
+	tm := New(0, NewRealClock(), ticker.C)
 
 	tm.Set(key, val, 20*time.Millisecond)
 	assert.Equal(t, val, tm.get(key, 0).value)
@@ -416,7 +416,7 @@ func TestExternalTicker(t *testing.T) {
 func TestBeforeCleanup(t *testing.T) {
 	const key, value = 1, 2
 
-	tm := New(1 * time.Hour)
+	tm := New(1*time.Hour, NewRealClock())
 
 	tm.Set(key, value, 5*time.Millisecond)
 
@@ -430,14 +430,14 @@ func TestBeforeCleanup(t *testing.T) {
 // --- BENCHMARKS ---
 
 func BenchmarkSetValues(b *testing.B) {
-	tm := New(1 * time.Minute)
+	tm := New(1*time.Minute, NewRealClock())
 	for n := 0; n < b.N; n++ {
 		tm.Set(n, n, 1*time.Hour)
 	}
 }
 
 func BenchmarkSetGetValues(b *testing.B) {
-	tm := New(1 * time.Minute)
+	tm := New(1*time.Minute, NewRealClock())
 	for n := 0; n < b.N; n++ {
 		tm.Set(n, n, 1*time.Hour)
 		tm.GetValue(n)
@@ -445,7 +445,7 @@ func BenchmarkSetGetValues(b *testing.B) {
 }
 
 func BenchmarkSetGetRemoveValues(b *testing.B) {
-	tm := New(1 * time.Minute)
+	tm := New(1*time.Minute, NewRealClock())
 	for n := 0; n < b.N; n++ {
 		tm.Set(n, n, 1*time.Hour)
 		tm.GetValue(n)
@@ -454,7 +454,7 @@ func BenchmarkSetGetRemoveValues(b *testing.B) {
 }
 
 func BenchmarkSetGetSameKey(b *testing.B) {
-	tm := New(1 * time.Minute)
+	tm := New(1*time.Minute, NewRealClock())
 	for n := 0; n < b.N; n++ {
 		tm.Set(1, n, 1*time.Hour)
 		tm.GetValue(1)
